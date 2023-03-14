@@ -1,3 +1,6 @@
+use crate::opcodes;
+use std::collections::HashMap;
+
 pub struct CPU {
     pub register_a: u8,
     pub register_x: u8,
@@ -65,27 +68,27 @@ impl CPU {
     }
 
     pub fn run(&mut self) {
+        let ref opcodes: HashMap<u8, &'static opcodes::OpCode> = *opcodes::OPCODES_MAP;
         loop {
             let code = self.mem_read(self.program_counter);
             self.program_counter += 1;
+            let program_counter_state = self.program_counter;
+
+            let opcode = opcodes.get(&code).expect(&format!("OpCode {:x} is not recognized", code));
 
             match code {
-                0xA9 => { // LDA
-                    self.lda(&AddressingMode::Immediate);
-                    self.program_counter += 1;
-                }
-                0xA5 => {
-                    self.lda(&AddressingMode::ZeroPage);
-                    self.program_counter += 1;
-                }
-                0xAD => {
-                    self.lda(&AddressingMode::Absolute);
-                    self.program_counter += 2;
+                // LDA
+                0xa9 | 0xa5 | 0xb5 | 0xad | 0xbd | 0xb9 | 0xa1 | 0xb1 => {
+                    self.lda(&opcode.mode);
                 }
                 0xAA => self.tax(), // TAX
                 0xE8 => self.inx(), // INX
                 0x00 => return, // BRK
                 _ => todo!()
+            }
+
+            if program_counter_state == self.program_counter {
+                self.program_counter += (opcode.len - 1) as u16;
             }
         }
     }
@@ -143,6 +146,11 @@ impl CPU {
 
         self.register_a = value;
         self.update_zero_and_negative_flags(self.register_a);
+    }
+
+    fn sta(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        self.mem_write(addr, self.register_a);
     }
 
     fn tax(&mut self) {
@@ -210,6 +218,16 @@ mod tests {
       cpu.load_and_run(vec![0xa9, 0x81, 0x00]);
 
       assert!(cpu.status & 0b1000_0000 != 0);
+  }
+
+  #[test]
+  fn test_lda_from_memory() {
+    let mut cpu = CPU::new();
+    cpu.mem_write(0x10, 0x55);
+
+    cpu.load_and_run(vec![0xa5, 0x10, 0x00]);
+
+    assert_eq!(cpu.register_a, 0x55);
   }
 
   #[test]
