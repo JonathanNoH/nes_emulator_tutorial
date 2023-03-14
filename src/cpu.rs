@@ -81,6 +81,10 @@ impl CPU {
                 0xa9 | 0xa5 | 0xb5 | 0xad | 0xbd | 0xb9 | 0xa1 | 0xb1 => {
                     self.lda(&opcode.mode);
                 }
+                // STA
+                0x85 | 0x95 | 0x8d | 0x9d | 0x99 | 0x1 | 0x91 => {
+                    self.sta(&opcode.mode);
+                }
                 0xAA => self.tax(), // TAX
                 0xE8 => self.inx(), // INX
                 0x00 => return, // BRK
@@ -258,5 +262,12 @@ mod tests {
     cpu.load_and_run(vec![0xa9, 0xc0, 0xaa, 0xe8, 0x00]);
 
     assert_eq!(cpu.register_x, 0xc1);
+  }
+
+  #[test]
+  fn test_sta() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0xa2, 0x85, 0x10, 0x00]);
+    assert_eq!(cpu.mem_read(0x10), 0xa2);
   }
 }
