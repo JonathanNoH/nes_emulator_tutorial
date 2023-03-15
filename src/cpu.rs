@@ -78,13 +78,20 @@ impl CPU {
 
             match code {
                 // ADC
+                0x69 | 0x65 | 0x75 | 0x6d | 0x7d | 0x79 | 0x61 | 0x71 => {
+                    self.adc(&opcode.mode);
+                }
                 // AND
                 0x29 | 0x25 | 0x35 | 0x2d | 0x3d | 0x39 | 0x21 | 0x31 => {
                     self.and(&opcode.mode);
                 }
-                //ASL
+                // ASL
                 0x0a | 0x06 | 0x16 | 0x0e | 0x1e => {
                     self.asl(&opcode.mode);
+                }
+                // BCC
+                0x90 => {
+                    self.bcc(&opcode.mode);
                 }
                 // LDA
                 0xa9 | 0xa5 | 0xb5 | 0xad | 0xbd | 0xb9 | 0xa1 | 0xb1 => {
@@ -153,8 +160,30 @@ impl CPU {
             }
         }
     }
-    fn adc() {
-        todo!();
+    fn adc(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+
+        // add self.register_a and value 
+        let (mut result, mut carry) = self.register_a.overflowing_add(value);
+        // add 1 if carry flag already set
+        if self.status & 0b0000_0001 != 0 {
+            (result, carry) = result.overflowing_add(1);
+        }
+        // set carry flag
+        if carry {
+            self.status = self.status | 0b0000_0001;
+        } else {
+            self.status = self.status & 0b1111_1110;
+        }
+        // set overflow with magic math
+        if ((self.register_a ^ result) & (value ^ result) & 0x80) != 0 {
+            self.status = self.status | 0b0100_0000;
+        } else {
+            self.status = self.status & 0b1011_1111;
+        }
+        self.register_a = result;
+        self.update_zero_and_negative_flags(result);
     }
 
     fn and(&mut self, mode: &AddressingMode) {
@@ -193,6 +222,16 @@ impl CPU {
                 self.mem_write(addr, result);
                 self.update_zero_and_negative_flags(result);
             }
+        }
+    }
+
+    fn bcc(&mut self, mode: &AddressingMode) {
+        // only do something if carry bit is 0
+        if self.status & 0b0000_0001 == 0 {
+            let addr = self.get_operand_address(mode);
+            let jump = self.mem_read(addr) as i8;
+
+            self.program_counter = self.program_counter.wrapping_add_signed(jump.into());
         }
     }
 
@@ -358,5 +397,36 @@ mod tests {
     cpu.load_and_run(vec![0xa9, 0xff, 0x85, 0x10, 0x06, 0x10, 0x00]);
     assert_eq!(cpu.mem_read(0x10), 0b1111_1110);
     assert!(cpu.status & 0b0000_0001 != 0);
+  }
+
+  #[test]
+  fn test_adc_immediate() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x01, 0x85, 0x10, 0x65, 0x10, 0x00]);
+    assert_eq!(cpu.register_a, 0x02);
+  }
+
+  #[test]
+  fn test_adc_sets_carry() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0xff, 0x85, 0x10, 0xa9, 0x01, 0x65, 0x10, 0x00]);
+    assert_eq!(cpu.register_a, 0x00);
+    assert!(cpu.status & 0b0000_0001 != 0);
+    assert!(cpu.status & 0b0100_0000 == 0);
+  }
+
+  #[test]
+  fn test_adc_sets_overflow() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x50, 0x85, 0x10, 0x65, 0x10, 0x00]);
+    assert!(cpu.status & 0b0000_0001 == 0);
+    assert!(cpu.status & 0b0100_0000 != 0);
+  }
+
+  #[test]
+  fn test_bcc_branches_on_clear() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0xfd, 0xaa, 0x69, 0x01, 0x90, 0xfc, 0x00]);
+    assert_eq!(cpu.register_x, 0x01);
   }
 }
