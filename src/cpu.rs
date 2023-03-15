@@ -231,7 +231,7 @@ impl CPU {
             let addr = self.get_operand_address(mode);
             let jump = self.mem_read(addr) as i8;
 
-            self.program_counter = self.program_counter.wrapping_add_signed(jump.into());
+            self.program_counter = self.program_counter.wrapping_add(1).wrapping_add_signed(jump.into());
         }
     }
 
@@ -426,7 +426,7 @@ mod tests {
   #[test]
   fn test_bcc_branches_on_clear() {
     let mut cpu = CPU::new();
-    cpu.load_and_run(vec![0xa9, 0xfd, 0xaa, 0x69, 0x01, 0x90, 0xfc, 0x00]);
-    assert_eq!(cpu.register_x, 0x01);
+    cpu.load_and_run(vec![0xa9, 0xfc, 0x69, 0x01, 0x90, 0xfc, 0x00]);
+    assert_eq!(cpu.register_x, 0x00);
   }
 }
