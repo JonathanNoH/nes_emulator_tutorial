@@ -82,6 +82,10 @@ impl CPU {
                 0x29 | 0x25 | 0x35 | 0x2d | 0x3d | 0x39 | 0x21 | 0x31 => {
                     self.and(&opcode.mode);
                 }
+                //ASL
+                0x0a | 0x06 | 0x16 | 0x0e | 0x1e => {
+                    self.asl(&opcode.mode);
+                }
                 // LDA
                 0xa9 | 0xa5 | 0xb5 | 0xad | 0xbd | 0xb9 | 0xa1 | 0xb1 => {
                     self.lda(&opcode.mode);
@@ -159,6 +163,37 @@ impl CPU {
 
         self.register_a = self.register_a & value;
         self.update_zero_and_negative_flags(self.register_a);
+    }
+
+    fn asl(&mut self, mode: &AddressingMode) {
+        match mode {
+            // Accumulator Addressing
+            AddressingMode::NoneAddressing => {
+                // set carry flag to contents of bit 7 before shift
+                if self.register_a & 0b1000_0000 != 0 {
+                    self.status = self.status | 0b0000_0001;
+                } else {
+                    self.status = self.status & 0b1111_1110;
+                }
+                self.register_a = (((self.register_a as u16) << 1) & 0b0_1111_1111) as u8;
+                self.update_zero_and_negative_flags(self.register_a);
+            } 
+            _ => {
+                let addr = self.get_operand_address(mode);
+                let value = self.mem_read(addr);
+                let result = (((value as u16) << 1) & 0b0_1111_1111) as u8;
+
+                // set carry flag
+                if value & 0b1000_0000 != 0 {
+                    self.status = self.status | 0b0000_0001;
+                } else {
+                    self.status = self.status & 0b1111_1110;
+                }
+
+                self.mem_write(addr, result);
+                self.update_zero_and_negative_flags(result);
+            }
+        }
     }
 
     fn lda(&mut self, mode: &AddressingMode) {
@@ -293,5 +328,35 @@ mod tests {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xa9, 0xa2, 0x85, 0x10, 0xa9, 0x03, 0x2d, 0x10, 0x00, 0x00]);
     assert_eq!(cpu.register_a, 0x02);
+  }
+
+  #[test]
+  fn test_asl_shifts_bit_in_memory() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x01, 0x85, 0x10, 0x06, 0x10, 0x00]);
+    assert_eq!(cpu.mem_read(0x10), 0x02);
+  }
+
+  #[test]
+  fn test_asl_shifts_accumulator() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x01, 0x0a, 0x00]);
+    assert_eq!(cpu.register_a, 0x02);
+  }
+
+  #[test]
+  fn test_asl_shift_accumulator_fills_carry_bit() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0xff, 0x0a, 0x00]);
+    assert_eq!(cpu.register_a, 0b1111_1110);
+    assert!(cpu.status & 0b0000_0001 != 0);
+  }
+
+  #[test]
+  fn test_asl_memory_fills_carry_bit() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0xff, 0x85, 0x10, 0x06, 0x10, 0x00]);
+    assert_eq!(cpu.mem_read(0x10), 0b1111_1110);
+    assert!(cpu.status & 0b0000_0001 != 0);
   }
 }
