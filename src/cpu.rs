@@ -139,6 +139,8 @@ impl CPU {
                 0x24 | 0x2C => {
                     self.bit(&opcode.mode);
                 }
+                // CLC
+                0x18 => self.clc(),
                 // LDA
                 0xa9 | 0xa5 | 0xb5 | 0xad | 0xbd | 0xb9 | 0xa1 | 0xb1 => {
                     self.lda(&opcode.mode);
@@ -368,6 +370,10 @@ impl CPU {
         }
     }
 
+    fn clc(&mut self) {
+        self.status = self.status & INV_CARRY_FLAG;
+    }
+
     fn lda(&mut self, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
         let value = self.mem_read(addr);
@@ -553,5 +559,12 @@ mod tests {
     assert_ne!(cpu.status & ZERO_FLAG, 0);
     assert_eq!(cpu.status & OVERFLOW_FLAG, 0);
     assert_eq!(cpu.status & NEGATIVE_FLAG, 0);
+  }
+
+  #[test]
+  fn test_clc() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0xff, 0x69, 0x01, 0x18, 0x00]);
+    assert_eq!(cpu.status & CARRY_FLAG, 0);
   }
 }
