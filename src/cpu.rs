@@ -171,6 +171,10 @@ impl CPU {
                 0x49 | 0x45 | 0x55 | 0x4d | 0x5d | 0x59 | 0x41 | 0x51 => {
                     self.eor(&opcode.mode);
                 }
+                // INC
+                0xe6 | 0xf6 | 0xee | 0xfe => {
+                    self.inc(&opcode.mode);
+                }
                 // LDA
                 0xa9 | 0xa5 | 0xb5 | 0xad | 0xbd | 0xb9 | 0xa1 | 0xb1 => {
                     self.lda(&opcode.mode);
@@ -451,6 +455,14 @@ impl CPU {
         let value = self.mem_read(addr);
         self.register_a = self.register_a ^ value;
         self.update_zero_and_negative_flags(self.register_a);
+    }
+
+    fn inc(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+        let result = value.wrapping_add(1);
+        self.mem_write(addr, result);
+        self.update_zero_and_negative_flags(result);
     }
 
     fn lda(&mut self, mode: &AddressingMode) {
@@ -738,7 +750,7 @@ mod tests {
   }
 
   #[test]
-  fn test_dec_dec_by_one() {
+  fn test_dec_by_one() {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xa9, 0x02, 0x85, 0x10, 0xc6, 0x10, 0x00]);
     assert_eq!(cpu.mem_read(0x10), 0x01);
@@ -776,5 +788,12 @@ mod tests {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xa9, 0xaa, 0x85, 0x10, 0xa9, 0xff, 0x45, 0x10, 0x00]);
     assert_eq!(cpu.register_a, 0x55);
+  }
+
+  #[test]
+  fn test_inc() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x02, 0x85, 0x10, 0xe6, 0x10, 0x00]);
+    assert_eq!(cpu.mem_read(0x10), 0x03);
   }
 }
