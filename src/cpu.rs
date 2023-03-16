@@ -163,6 +163,10 @@ impl CPU {
                 0xc6 | 0xd6 | 0xce | 0xde => {
                     self.dec(&opcode.mode);
                 }
+                // DEX
+                0xca => self.dex(),
+                // DEY
+                0x88 => self.dey(),
                 // LDA
                 0xa9 | 0xa5 | 0xb5 | 0xad | 0xbd | 0xb9 | 0xa1 | 0xb1 => {
                     self.lda(&opcode.mode);
@@ -426,6 +430,16 @@ impl CPU {
         let result = value.wrapping_sub(1);
         self.mem_write(addr, result);
         self.update_zero_and_negative_flags(result);
+    }
+
+    fn dex(&mut self) {
+        self.register_x = self.register_x.wrapping_sub(1);
+        self.update_zero_and_negative_flags(self.register_x);
+    }
+
+    fn dey(&mut self) {
+        self.register_y = self.register_y.wrapping_sub(1);
+        self.update_zero_and_negative_flags(self.register_y);
     }
 
     fn lda(&mut self, mode: &AddressingMode) {
@@ -723,5 +737,26 @@ mod tests {
   fn test_dec_set_zero() {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xa9, 0x01, 0x85, 0x10, 0xc6, 0x10, 0x00]);
+    assert_ne!(cpu.status & ZERO_FLAG, 0);
+  }
+
+  #[test]
+  fn test_dex() {
+    let mut cpu = CPU::new();
+    cpu.load(vec![0xca, 0x00]);
+    cpu.reset();
+    cpu.register_x = 0x02;
+    cpu.run();
+    assert_eq!(cpu.register_x, 1);
+  }
+
+  #[test]
+  fn test_dey() {
+    let mut cpu = CPU::new();
+    cpu.load(vec![0x88, 0x00]);
+    cpu.reset();
+    cpu.register_y = 0x02;
+    cpu.run();
+    assert_eq!(cpu.register_y, 1);
   }
 }
