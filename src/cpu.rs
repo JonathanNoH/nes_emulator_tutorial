@@ -175,6 +175,10 @@ impl CPU {
                 0xe6 | 0xf6 | 0xee | 0xfe => {
                     self.inc(&opcode.mode);
                 }
+                // INX
+                0xE8 => self.inx(),
+                // INY
+                0xc8 => self.iny(),
                 // LDA
                 0xa9 | 0xa5 | 0xb5 | 0xad | 0xbd | 0xb9 | 0xa1 | 0xb1 => {
                     self.lda(&opcode.mode);
@@ -184,7 +188,6 @@ impl CPU {
                     self.sta(&opcode.mode);
                 }
                 0xAA => self.tax(), // TAX
-                0xE8 => self.inx(), // INX
                 0x00 => return, // BRK
                 _ => todo!()
             }
@@ -465,6 +468,16 @@ impl CPU {
         self.update_zero_and_negative_flags(result);
     }
 
+    fn inx(&mut self) {
+        self.register_x = self.register_x.wrapping_add(1);
+        self.update_zero_and_negative_flags(self.register_x);
+    }
+
+    fn iny(&mut self) {
+        self.register_y = self.register_y.wrapping_add(1);
+        self.update_zero_and_negative_flags(self.register_y);
+    }
+
     fn lda(&mut self, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
         let value = self.mem_read(addr);
@@ -480,11 +493,6 @@ impl CPU {
 
     fn tax(&mut self) {
         self.register_x = self.register_a;
-        self.update_zero_and_negative_flags(self.register_x);
-    }
-
-    fn inx(&mut self) {
-        self.register_x = self.register_x.wrapping_add(1);
         self.update_zero_and_negative_flags(self.register_x);
     }
 }
@@ -795,5 +803,15 @@ mod tests {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xa9, 0x02, 0x85, 0x10, 0xe6, 0x10, 0x00]);
     assert_eq!(cpu.mem_read(0x10), 0x03);
+  }
+
+  #[test]
+  fn test_iny() {
+    let mut cpu = CPU::new();
+    cpu.load(vec![0xc8, 0x00]);
+    cpu.reset();
+    cpu.register_y = 0x01;
+    cpu.run();
+    assert_eq!(cpu.register_y, 0x02);
   }
 }
