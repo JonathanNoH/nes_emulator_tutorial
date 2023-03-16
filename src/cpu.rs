@@ -27,6 +27,17 @@ pub enum AddressingMode {
   
 impl CPU {
 
+    pub fn new() -> Self {
+        CPU {
+            register_a: 0,
+            register_x: 0,
+            register_y: 0,
+            status: 0,
+            program_counter: 0,
+            memory: [0x00; 0xFFFF]
+        }
+    }
+
     fn mem_read(&self, addr: u16) -> u8 {
         self.memory[addr as usize]
     }
@@ -113,6 +124,28 @@ impl CPU {
         }
     }
 
+    fn update_carry_flag(&mut self, carry: bool) {
+        if carry {
+            self.status = self.status | 0b0000_0001;
+        } else {
+            self.status = self.status & 0b1111_1110;
+        }
+    }
+
+    fn update_zero_and_negative_flags(&mut self, result: u8) {
+        if result == 0 {
+            self.status = self.status | 0b0000_0010;
+        } else {
+            self.status = self.status & 0b1111_1101;
+        }
+
+        if result & 0b1000_0000 != 0 {
+            self.status = self.status | 0b1000_0000;
+        } else {
+            self.status = self.status & 0b0111_1111;
+        }
+    }
+
     fn get_operand_address(&self, mode: &AddressingMode) -> u16 {
         match mode {
             AddressingMode::Immediate => self.program_counter,
@@ -160,6 +193,7 @@ impl CPU {
             }
         }
     }
+
     fn adc(&mut self, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
         let value = self.mem_read(addr);
@@ -171,11 +205,7 @@ impl CPU {
             (result, carry) = result.overflowing_add(1);
         }
         // set carry flag
-        if carry {
-            self.status = self.status | 0b0000_0001;
-        } else {
-            self.status = self.status & 0b1111_1110;
-        }
+        self.update_carry_flag(carry);
         // set overflow with magic math
         if ((self.register_a ^ result) & (value ^ result) & 0x80) != 0 {
             self.status = self.status | 0b0100_0000;
@@ -199,11 +229,8 @@ impl CPU {
             // Accumulator Addressing
             AddressingMode::NoneAddressing => {
                 // set carry flag to contents of bit 7 before shift
-                if self.register_a & 0b1000_0000 != 0 {
-                    self.status = self.status | 0b0000_0001;
-                } else {
-                    self.status = self.status & 0b1111_1110;
-                }
+                self.update_carry_flag(self.register_a & 0b1000_0000 != 0);
+                //shift
                 self.register_a = (((self.register_a as u16) << 1) & 0b0_1111_1111) as u8;
                 self.update_zero_and_negative_flags(self.register_a);
             } 
@@ -213,11 +240,7 @@ impl CPU {
                 let result = (((value as u16) << 1) & 0b0_1111_1111) as u8;
 
                 // set carry flag
-                if value & 0b1000_0000 != 0 {
-                    self.status = self.status | 0b0000_0001;
-                } else {
-                    self.status = self.status & 0b1111_1110;
-                }
+                self.update_carry_flag(value & 0b1000_0000 != 0);
 
                 self.mem_write(addr, result);
                 self.update_zero_and_negative_flags(result);
@@ -256,31 +279,6 @@ impl CPU {
     fn inx(&mut self) {
         self.register_x = self.register_x.wrapping_add(1);
         self.update_zero_and_negative_flags(self.register_x);
-    }
-
-    fn update_zero_and_negative_flags(&mut self, result: u8) {
-        if result == 0 {
-            self.status = self.status | 0b0000_0010;
-        } else {
-            self.status = self.status & 0b1111_1101;
-        }
-
-        if result & 0b1000_0000 != 0 {
-            self.status = self.status | 0b1000_0000;
-        } else {
-            self.status = self.status & 0b0111_1111;
-        }
-    }
-
-    pub fn new() -> Self {
-        CPU {
-            register_a: 0,
-            register_x: 0,
-            register_y: 0,
-            status: 0,
-            program_counter: 0,
-            memory: [0x00; 0xFFFF]
-        }
     }
 }
 
