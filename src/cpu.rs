@@ -206,8 +206,14 @@ impl CPU {
                 0x4a | 0x46 | 0x56 | 0x4e | 0x5e => {
                     self.lsr(&opcode.mode);
                 }
+                // NOP
+                0xea => self.nop(),
+                // ORA
+                0x09 | 0x05 | 0x15 | 0x0d | 0x1d | 0x19 | 0x01 | 0x11 => {
+                    self.ora(&opcode.mode);
+                }
                 // STA
-                0x85 | 0x95 | 0x8d | 0x9d | 0x99 | 0x1 | 0x91 => {
+                0x85 | 0x95 | 0x8d | 0x9d | 0x99 | 0x81 | 0x91 => {
                     self.sta(&opcode.mode);
                 }
                 0xAA => self.tax(), // TAX
@@ -559,6 +565,17 @@ impl CPU {
                 self.update_zero_and_negative_flags(result);
             }
         }
+    }
+
+    fn nop(&self) {
+        return;
+    }
+
+    fn ora(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+        self.register_a = self.register_a | value;
+        self.update_zero_and_negative_flags(self.register_a);
     }
 
     fn sta(&mut self, mode: &AddressingMode) {
@@ -931,5 +948,19 @@ mod tests {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xa9, 0xfe, 0x85, 0x10, 0xa2, 0x01, 0x56, 0x0f, 0x00]);
     assert_eq!(cpu.mem_read(0x10), 0x7f);
+  }
+
+  #[test]
+  fn test_nop() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xea, 0x00]);
+    assert_eq!(cpu.program_counter, 0x8002);
+  }
+
+  #[test]
+  fn test_ora() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x01, 0x85, 0x10, 0xa9, 0x02, 0x05, 0x10, 0x00]);
+    assert_eq!(cpu.register_a, 0x03);
   }
 }
