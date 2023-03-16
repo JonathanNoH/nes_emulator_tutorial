@@ -39,6 +39,7 @@ pub enum AddressingMode {
     Absolute,
     Absolute_X,
     Absolute_Y,
+    Indirect,
     Indirect_X,
     Indirect_Y,
     NoneAddressing,
@@ -179,6 +180,10 @@ impl CPU {
                 0xE8 => self.inx(),
                 // INY
                 0xc8 => self.iny(),
+                // JMP
+                0x4c | 0x6c => {
+                    self.jmp(&opcode.mode);
+                }
                 // LDA
                 0xa9 | 0xa5 | 0xb5 | 0xad | 0xbd | 0xb9 | 0xa1 | 0xb1 => {
                     self.lda(&opcode.mode);
@@ -244,6 +249,13 @@ impl CPU {
                 let base = self.mem_read_u16(self.program_counter);
                 let addr = base.wrapping_add(self.register_y as u16);
                 addr
+            }
+            AddressingMode::Indirect => {
+                //060f
+                let addr = self.mem_read_u16(self.program_counter);
+                let lo = self.mem_read(addr);
+                let hi = self.mem_read(addr.wrapping_add(1));
+                (hi as u16) << 8 | (lo as u16)
             }
             AddressingMode::Indirect_X => {
                 let base = self.mem_read(self.program_counter);
@@ -476,6 +488,12 @@ impl CPU {
     fn iny(&mut self) {
         self.register_y = self.register_y.wrapping_add(1);
         self.update_zero_and_negative_flags(self.register_y);
+    }
+
+    fn jmp(&mut self, mode: &AddressingMode) {
+        let jump_addr = self.get_operand_address(mode);
+
+        self.program_counter = jump_addr;
     }
 
     fn lda(&mut self, mode: &AddressingMode) {
@@ -813,5 +831,25 @@ mod tests {
     cpu.register_y = 0x01;
     cpu.run();
     assert_eq!(cpu.register_y, 0x02);
+  }
+
+  #[test]
+  fn test_absolute_jump() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x00, 0x69, 0x01, 0x4c, 0x09, 0x06, 0x69, 0x01, 0x00]);
+    assert_eq!(cpu.register_a, 0x01);
+  }
+
+  #[test]
+  fn test_indirect_jump() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x0f, 0x85, 0x10, 0xa9, 0x80, 0x85, 0x11, 0xa9, 0x01, 0x6c, 0x10, 0x00, 0x69, 0x01, 0x69, 0x01, 0x00]);
+    assert_eq!(cpu.register_a, 0x02);
+  }
+
+  #[test]
+  fn test_get_indirect() {
+    
+
   }
 }
