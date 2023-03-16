@@ -159,6 +159,10 @@ impl CPU {
                 0xc0 | 0xc4 | 0xcc => {
                     self.cpy(&opcode.mode);
                 }
+                // DEC
+                0xc6 | 0xd6 | 0xce | 0xde => {
+                    self.dec(&opcode.mode);
+                }
                 // LDA
                 0xa9 | 0xa5 | 0xb5 | 0xad | 0xbd | 0xb9 | 0xa1 | 0xb1 => {
                     self.lda(&opcode.mode);
@@ -414,6 +418,14 @@ impl CPU {
 
     fn cpy(&mut self, mode: &AddressingMode) {
         self.compare(self.register_y, mode);
+    }
+
+    fn dec(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+        let result = value.wrapping_sub(1);
+        self.mem_write(addr, result);
+        self.update_zero_and_negative_flags(result);
     }
 
     fn lda(&mut self, mode: &AddressingMode) {
@@ -698,5 +710,18 @@ mod tests {
     assert_ne!(cpu.status & CARRY_FLAG, 0);
     assert_eq!(cpu.status & NEGATIVE_FLAG, 0);
     assert_eq!(cpu.status & ZERO_FLAG, 0);
+  }
+
+  #[test]
+  fn test_dec_dec_by_one() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x02, 0x85, 0x10, 0xc6, 0x10, 0x00]);
+    assert_eq!(cpu.mem_read(0x10), 0x01);
+  }
+
+  #[test]
+  fn test_dec_set_zero() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x01, 0x85, 0x10, 0xc6, 0x10, 0x00]);
   }
 }
