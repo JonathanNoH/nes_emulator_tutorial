@@ -19,13 +19,17 @@ pub const INV_BREAK_TWO: u8 =         0b1101_1111;
 pub const INV_OVERFLOW_FLAG: u8 =     0b1011_1111;
 pub const INV_NEGATIVE_FLAG: u8 =     0b0111_1111;
 
+const STACK: u16 = 0x0100;
+const STACK_RESET: u8 = 0xff;
+
 
 pub struct CPU {
     pub register_a: u8,
     pub register_x: u8,
     pub register_y: u8,
     pub status: u8,
-    pub program_counter: u16,  
+    pub program_counter: u16,
+    pub stack_ptr: u8,
     memory: [u8; 0xFFFF]
 }
 
@@ -54,6 +58,7 @@ impl CPU {
             register_y: 0,
             status: 0,
             program_counter: 0,
+            stack_ptr: STACK_RESET,
             memory: [0x00; 0xFFFF]
         }
     }
@@ -184,9 +189,18 @@ impl CPU {
                 0x4c | 0x6c => {
                     self.jmp(&opcode.mode);
                 }
+                //JSR
                 // LDA
                 0xa9 | 0xa5 | 0xb5 | 0xad | 0xbd | 0xb9 | 0xa1 | 0xb1 => {
                     self.lda(&opcode.mode);
+                }
+                // LDX
+                0xa2 | 0xa6 | 0xb6 | 0xae | 0xbe => {
+                    self.ldx(&opcode.mode);
+                }
+                // LDY
+                0xa0 | 0xa4 | 0xb4 | 0xac | 0xbc => {
+                    self.ldy(&opcode.mode);
                 }
                 // STA
                 0x85 | 0x95 | 0x8d | 0x9d | 0x99 | 0x1 | 0x91 => {
@@ -496,12 +510,32 @@ impl CPU {
         self.program_counter = jump_addr;
     }
 
+    fn jsr(&mut self, mode: &AddressingMode) {
+        todo!()
+    }
+
     fn lda(&mut self, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
         let value = self.mem_read(addr);
 
         self.register_a = value;
         self.update_zero_and_negative_flags(self.register_a);
+    }
+
+    fn ldx(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+
+        self.register_x = value;
+        self.update_zero_and_negative_flags(self.register_x);
+    }
+
+    fn ldy(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+
+        self.register_y = value;
+        self.update_zero_and_negative_flags(self.register_y);
     }
 
     fn sta(&mut self, mode: &AddressingMode) {
@@ -848,8 +882,16 @@ mod tests {
   }
 
   #[test]
-  fn test_get_indirect() {
-    
+  fn test_ldx() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa2, 0x03, 0x00]);
+    assert_eq!(cpu.register_x, 0x03);
+  }
 
+  #[test]
+  fn test_ldy() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x10, 0x85, 0x10, 0xa4, 0x10, 0x00]);
+    assert_eq!(cpu.register_y, 0x10);
   }
 }
