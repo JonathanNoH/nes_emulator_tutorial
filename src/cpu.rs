@@ -1,6 +1,15 @@
 use crate::opcodes;
 use std::collections::HashMap;
 
+pub const CARRY_FLAG: u8 =        0b0000_0001;
+pub const ZERO_FLAG: u8 =         0b0000_0010;
+pub const INTERRUPT_DISABLE: u8 = 0b0000_0100;
+pub const DECIMAL_MODE_FLAG: u8 = 0b0000_1000;
+pub const BREAK_ONE: u8 =         0b0001_0000;
+pub const BREAK_TWO: u8 =         0b0010_0000;
+pub const OVERFLOW_FLAG: u8 =     0b0100_0000;
+pub const NEGATIVE_FLAG: u8 =     0b1000_0000;
+
 pub struct CPU {
     pub register_a: u8,
     pub register_x: u8,
@@ -101,9 +110,21 @@ impl CPU {
                     self.asl(&opcode.mode);
                 }
                 // BCC
-                0x90 => {
-                    self.bcc(&opcode.mode);
-                }
+                0x90 => self.bcc(),
+                // BCS
+                0xB0 => self.bcs(),
+                // BEQ
+                0xF0 => self.beq(),
+                // BMI
+                0x30 => self.bmi(),
+                // BNE
+                0xd0 => self.bne(),
+                // BPL
+                0x10 => self.bpl(),
+                // BVC
+                0x50 => self.bvc(),
+                // BVS
+                0x70 => self.bvs(),
                 // LDA
                 0xa9 | 0xa5 | 0xb5 | 0xad | 0xbd | 0xb9 | 0xa1 | 0xb1 => {
                     self.lda(&opcode.mode);
@@ -248,13 +269,66 @@ impl CPU {
         }
     }
 
-    fn bcc(&mut self, mode: &AddressingMode) {
-        // only do something if carry bit is 0
-        if self.status & 0b0000_0001 == 0 {
-            let addr = self.get_operand_address(mode);
-            let jump = self.mem_read(addr) as i8;
+    fn branch(&mut self) {
+        let jump: i8 = self.mem_read(self.program_counter) as i8;
+        let jump_addr = self.program_counter.wrapping_add(1).wrapping_add(jump as u16);
 
-            self.program_counter = self.program_counter.wrapping_add(1).wrapping_add_signed(jump.into());
+        self.program_counter = jump_addr;
+    }
+
+    fn bcc(&mut self) {
+        // only branch if carry bit is 0
+        if self.status & CARRY_FLAG == 0 {
+            self.branch();
+        }
+    }
+
+    fn bcs(&mut self) {
+        // only branch if carry bit is 1
+        if self.status & CARRY_FLAG != 0 {
+            self.branch();
+        }
+    }
+
+    fn beq(&mut self) {
+        // only branch if zero flag set
+        if self.status & ZERO_FLAG != 0 {
+            self.branch();
+        }
+    }
+
+    fn bmi(&mut self) {
+        // branch on negative flag set
+        if self.status & NEGATIVE_FLAG != 0 {
+            self.branch();
+        }
+    }
+
+    fn bne(&mut self) {
+        // branch on zero flag clear
+        if self.status & ZERO_FLAG == 0 {
+            self.branch();
+        }
+    }
+
+    fn bpl(&mut self) {
+        // branch on positive
+        if self.status & NEGATIVE_FLAG == 0 {
+            self.branch();
+        }
+    }
+
+    fn bvc(&mut self) {
+        // branch on no overflow
+        if self.status & OVERFLOW_FLAG == 0 {
+            self.branch();
+        }
+    }
+
+    fn bvs(&mut self) {
+        // branch on overflow
+        if self.status & OVERFLOW_FLAG != 0 {
+            self.branch();
         }
     }
 
