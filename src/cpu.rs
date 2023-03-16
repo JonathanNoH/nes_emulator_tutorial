@@ -202,13 +202,17 @@ impl CPU {
                 0xa0 | 0xa4 | 0xb4 | 0xac | 0xbc => {
                     self.ldy(&opcode.mode);
                 }
+                // LSR
+                0x4a | 0x46 | 0x56 | 0x4e | 0x5e => {
+                    self.lsr(&opcode.mode);
+                }
                 // STA
                 0x85 | 0x95 | 0x8d | 0x9d | 0x99 | 0x1 | 0x91 => {
                     self.sta(&opcode.mode);
                 }
                 0xAA => self.tax(), // TAX
                 0x00 => return, // BRK
-                _ => todo!()
+                _ => panic!("Something went wrong. Invalid Command.")
             }
 
             if program_counter_state == self.program_counter {
@@ -536,6 +540,25 @@ impl CPU {
 
         self.register_y = value;
         self.update_zero_and_negative_flags(self.register_y);
+    }
+
+    fn lsr(&mut self, mode: &AddressingMode) {
+        match mode {
+            AddressingMode::NoneAddressing => {
+                self.update_carry_flag(self.register_a & CARRY_FLAG != 0);
+                self.register_a = self.register_a >> 1;
+                self.update_zero_and_negative_flags(self.register_a);
+            }
+            _ => {
+                let addr = self.get_operand_address(mode);
+                let value = self.mem_read(addr);
+                let result = value >> 1;
+
+                self.update_carry_flag(value & CARRY_FLAG != 0);
+                self.mem_write(addr, result);
+                self.update_zero_and_negative_flags(result);
+            }
+        }
     }
 
     fn sta(&mut self, mode: &AddressingMode) {
@@ -893,5 +916,20 @@ mod tests {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xa9, 0x10, 0x85, 0x10, 0xa4, 0x10, 0x00]);
     assert_eq!(cpu.register_y, 0x10);
+  }
+
+  #[test]
+  fn test_lsr_accumulator() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x01, 0x4a, 0x00]);
+    assert_eq!(cpu.register_a, 0);
+    assert_ne!(cpu.status & CARRY_FLAG, 0);
+  }
+
+  #[test]
+  fn test_lsr_memory_zero_page_x() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0xfe, 0x85, 0x10, 0xa2, 0x01, 0x56, 0x0f, 0x00]);
+    assert_eq!(cpu.mem_read(0x10), 0x7f);
   }
 }
