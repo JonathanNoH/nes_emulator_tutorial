@@ -10,6 +10,16 @@ pub const BREAK_TWO: u8 =         0b0010_0000;
 pub const OVERFLOW_FLAG: u8 =     0b0100_0000;
 pub const NEGATIVE_FLAG: u8 =     0b1000_0000;
 
+pub const INV_CARRY_FLAG: u8 =        0b1111_1110;
+pub const INV_ZERO_FLAG: u8 =         0b1111_1101;
+pub const INV_INTERRUPT_DISABLE: u8 = 0b1111_1011;
+pub const INV_DECIMAL_MODE_FLAG: u8 = 0b1111_0111;
+pub const INV_BREAK_ONE: u8 =         0b1110_1111;
+pub const INV_BREAK_TWO: u8 =         0b1101_1111;
+pub const INV_OVERFLOW_FLAG: u8 =     0b1011_1111;
+pub const INV_NEGATIVE_FLAG: u8 =     0b0111_1111;
+
+
 pub struct CPU {
     pub register_a: u8,
     pub register_x: u8,
@@ -125,6 +135,10 @@ impl CPU {
                 0x50 => self.bvc(),
                 // BVS
                 0x70 => self.bvs(),
+                // BIT
+                0x24 | 0x2C => {
+                    self.bit(&opcode.mode);
+                }
                 // LDA
                 0xa9 | 0xa5 | 0xb5 | 0xad | 0xbd | 0xb9 | 0xa1 | 0xb1 => {
                     self.lda(&opcode.mode);
@@ -147,23 +161,23 @@ impl CPU {
 
     fn update_carry_flag(&mut self, carry: bool) {
         if carry {
-            self.status = self.status | 0b0000_0001;
+            self.status = self.status | CARRY_FLAG;
         } else {
-            self.status = self.status & 0b1111_1110;
+            self.status = self.status & INV_CARRY_FLAG;
         }
     }
 
     fn update_zero_and_negative_flags(&mut self, result: u8) {
         if result == 0 {
-            self.status = self.status | 0b0000_0010;
+            self.status = self.status | ZERO_FLAG;
         } else {
-            self.status = self.status & 0b1111_1101;
+            self.status = self.status & INV_ZERO_FLAG;
         }
 
         if result & 0b1000_0000 != 0 {
-            self.status = self.status | 0b1000_0000;
+            self.status = self.status | NEGATIVE_FLAG;
         } else {
-            self.status = self.status & 0b0111_1111;
+            self.status = self.status & INV_NEGATIVE_FLAG;
         }
     }
 
@@ -229,9 +243,9 @@ impl CPU {
         self.update_carry_flag(carry);
         // set overflow with magic math
         if ((self.register_a ^ result) & (value ^ result) & 0x80) != 0 {
-            self.status = self.status | 0b0100_0000;
+            self.status = self.status | OVERFLOW_FLAG;
         } else {
-            self.status = self.status & 0b1011_1111;
+            self.status = self.status & INV_OVERFLOW_FLAG;
         }
         self.register_a = result;
         self.update_zero_and_negative_flags(result);
@@ -332,6 +346,28 @@ impl CPU {
         }
     }
 
+    fn bit(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let data = self.mem_read(addr);
+
+        let test = data & self.register_a;
+        if test == 0 {
+            self.status = self.status | ZERO_FLAG;
+        } else {
+            self.status = self.status & INV_ZERO_FLAG;
+        }
+        if data & 0b1000_0000 != 0 {
+            self.status = self.status | NEGATIVE_FLAG;
+        } else {
+            self.status = self.status & INV_NEGATIVE_FLAG;
+        }
+        if data & 0b0100_0000 != 0 {
+            self.status = self.status | OVERFLOW_FLAG;
+        } else {
+            self.status = self.status & INV_OVERFLOW_FLAG;
+        }
+    }
+
     fn lda(&mut self, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
         let value = self.mem_read(addr);
@@ -359,7 +395,6 @@ impl CPU {
 #[cfg(test)]
 mod tests {
     use super::*;
-
   
   #[test]
   fn test_0xa9_lda_load_data() {
@@ -367,8 +402,8 @@ mod tests {
       cpu.load_and_run(vec![0xa9, 0x05, 0x00]);
 
       assert_eq!(cpu.register_a, 0x05);
-      assert!(cpu.status & 0b0000_0010 == 0b00);
-      assert!(cpu.status & 0b1000_0000 == 0);
+      assert!(cpu.status & ZERO_FLAG == 0b00);
+      assert!(cpu.status & NEGATIVE_FLAG == 0);
   }
 
   #[test]
@@ -376,7 +411,7 @@ mod tests {
       let mut cpu = CPU::new();
       cpu.load_and_run(vec![0xa9, 0x00, 0x00]);
 
-      assert!(cpu.status & 0b0000_0010 == 0b10);
+      assert!(cpu.status & ZERO_FLAG == 0b10);
   }
 
   #[test]
@@ -384,7 +419,7 @@ mod tests {
       let mut cpu = CPU::new();
       cpu.load_and_run(vec![0xa9, 0x81, 0x00]);
 
-      assert!(cpu.status & 0b1000_0000 != 0);
+      assert!(cpu.status & NEGATIVE_FLAG != 0);
   }
 
   #[test]
@@ -460,7 +495,7 @@ mod tests {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xa9, 0xff, 0x0a, 0x00]);
     assert_eq!(cpu.register_a, 0b1111_1110);
-    assert!(cpu.status & 0b0000_0001 != 0);
+    assert!(cpu.status & CARRY_FLAG != 0);
   }
 
   #[test]
@@ -468,7 +503,7 @@ mod tests {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xa9, 0xff, 0x85, 0x10, 0x06, 0x10, 0x00]);
     assert_eq!(cpu.mem_read(0x10), 0b1111_1110);
-    assert!(cpu.status & 0b0000_0001 != 0);
+    assert!(cpu.status & CARRY_FLAG != 0);
   }
 
   #[test]
@@ -483,16 +518,16 @@ mod tests {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xa9, 0xff, 0x85, 0x10, 0xa9, 0x01, 0x65, 0x10, 0x00]);
     assert_eq!(cpu.register_a, 0x00);
-    assert!(cpu.status & 0b0000_0001 != 0);
-    assert!(cpu.status & 0b0100_0000 == 0);
+    assert!(cpu.status & CARRY_FLAG != 0);
+    assert!(cpu.status & OVERFLOW_FLAG == 0);
   }
 
   #[test]
   fn test_adc_sets_overflow() {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xa9, 0x50, 0x85, 0x10, 0x65, 0x10, 0x00]);
-    assert!(cpu.status & 0b0000_0001 == 0);
-    assert!(cpu.status & 0b0100_0000 != 0);
+    assert!(cpu.status & CARRY_FLAG == 0);
+    assert!(cpu.status & OVERFLOW_FLAG != 0);
   }
 
   #[test]
@@ -500,5 +535,23 @@ mod tests {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xa9, 0xfc, 0x69, 0x01, 0x90, 0xfc, 0x00]);
     assert_eq!(cpu.register_x, 0x00);
+  }
+
+  #[test]
+  fn test_bit_set_neg_and_overflow() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0xc0, 0x85, 0x10, 0x24, 0x10, 0x00]);
+    assert_ne!(cpu.status & NEGATIVE_FLAG, 0);
+    assert_ne!(cpu.status & OVERFLOW_FLAG, 0);
+    assert_eq!(cpu.status & ZERO_FLAG, 0)
+  }
+
+  #[test]
+  fn test_bit_set_zero() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x00, 0x85, 0x10, 0x24, 0x10, 0x00]);
+    assert_ne!(cpu.status & ZERO_FLAG, 0);
+    assert_eq!(cpu.status & OVERFLOW_FLAG, 0);
+    assert_eq!(cpu.status & NEGATIVE_FLAG, 0);
   }
 }
