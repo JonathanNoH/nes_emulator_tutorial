@@ -147,6 +147,18 @@ impl CPU {
                 0x58 => self.cli(),
                 // CLV
                 0xb8 => self.clv(),
+                // CMP
+                0xc9 | 0xC5 | 0xd5 | 0xcd | 0xdd | 0xd9 | 0xc1 | 0xd1 => {
+                    self.cmp(&opcode.mode);
+                }
+                // CPX
+                0xe0 | 0xe4 | 0xec => {
+                    self.cpx(&opcode.mode);
+                }
+                // CPY
+                0xc0 | 0xc4 | 0xcc => {
+                    self.cpy(&opcode.mode);
+                }
                 // LDA
                 0xa9 | 0xa5 | 0xb5 | 0xad | 0xbd | 0xb9 | 0xa1 | 0xb1 => {
                     self.lda(&opcode.mode);
@@ -359,16 +371,7 @@ impl CPU {
         let data = self.mem_read(addr);
 
         let test = data & self.register_a;
-        if test == 0 {
-            self.status = self.status | ZERO_FLAG;
-        } else {
-            self.status = self.status & INV_ZERO_FLAG;
-        }
-        if data & 0b1000_0000 != 0 {
-            self.status = self.status | NEGATIVE_FLAG;
-        } else {
-            self.status = self.status & INV_NEGATIVE_FLAG;
-        }
+        self.update_zero_and_negative_flags(test);
         if data & 0b0100_0000 != 0 {
             self.status = self.status | OVERFLOW_FLAG;
         } else {
@@ -388,6 +391,29 @@ impl CPU {
     }
     fn clv(&mut self) {
         self.status = self.status & INV_OVERFLOW_FLAG;
+    }
+
+    fn compare(&mut self, comparator: u8, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+        if comparator >= value {
+            self.status = self.status | CARRY_FLAG;
+        } else {
+            self.status = self.status & INV_CARRY_FLAG;
+        }
+        self.update_zero_and_negative_flags(comparator.wrapping_sub(value));
+    }
+
+    fn cmp(&mut self, mode: &AddressingMode) {
+        self.compare(self.register_a, mode);
+    }
+
+    fn cpx(&mut self, mode: &AddressingMode) {
+        self.compare(self.register_x, mode);
+    }
+
+    fn cpy(&mut self, mode: &AddressingMode) {
+        self.compare(self.register_y, mode);
     }
 
     fn lda(&mut self, mode: &AddressingMode) {
@@ -612,5 +638,65 @@ mod tests {
     cpu.status = cpu.status | OVERFLOW_FLAG;
     cpu.run();
     assert_eq!(cpu.status & OVERFLOW_FLAG, 0);
+  }
+
+  #[test]
+  fn test_cmp_set_carry() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x02, 0x85, 0x10, 0xa9, 0x03, 0xcd, 0x10, 0x00, 0x00]);
+    assert_ne!(cpu.status & CARRY_FLAG, 0);
+    assert_eq!(cpu.status & ZERO_FLAG, 0);
+    assert_eq!(cpu.status & NEGATIVE_FLAG, 0);
+  }
+
+  #[test]
+  fn test_cmp_set_zero() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x02, 0x85, 0x10, 0xc5, 0x10, 0x00]);
+    assert_ne!(cpu.status & CARRY_FLAG, 0);
+    assert_ne!(cpu.status & ZERO_FLAG, 0);
+    assert_eq!(cpu.status & NEGATIVE_FLAG, 0);
+  }
+
+  #[test]
+  fn test_cmp_set_negative_and_carry() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x02, 0x85, 0x10, 0xa9, 0xff, 0xc5, 0x10, 0x00]);
+    assert_ne!(cpu.status & CARRY_FLAG, 0);
+    assert_eq!(cpu.status & ZERO_FLAG, 0);
+    assert_ne!(cpu.status & NEGATIVE_FLAG, 0);
+  }
+
+  #[test]
+  fn test_cmp_set_negative_only(){
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0xfe, 0x85, 0x10, 0xa9, 0xf0, 0xc5, 0x10, 0x00]);
+    assert_ne!(cpu.status & NEGATIVE_FLAG, 0);
+    assert_eq!(cpu.status & CARRY_FLAG, 0);
+    assert_eq!(cpu.status & ZERO_FLAG, 0);
+  }
+
+  #[test]
+  fn test_cpx() {
+    let mut cpu = CPU::new();
+    cpu.load(vec![0xa9, 0xf0, 0x85, 0x10, 0xe4, 0x10, 0x00]);
+    cpu.reset();
+    cpu.register_x = 0xfe;
+    cpu.run();
+    assert_ne!(cpu.status & CARRY_FLAG, 0);
+    assert_eq!(cpu.status & NEGATIVE_FLAG, 0);
+    assert_eq!(cpu.status & ZERO_FLAG, 0);
+  }
+
+  #[test]
+  fn test_cpy() {
+    let mut cpu = CPU::new();
+    cpu.load(vec![0xa9, 0xf0, 0x85, 0x10, 0xc4, 0x10, 0x00]);
+    cpu.reset();
+    cpu.register_y = 0xfe;
+    cpu.run();
+    assert_ne!(cpu.status & CARRY_FLAG, 0);
+    assert_eq!(cpu.status & NEGATIVE_FLAG, 0);
+    assert_eq!(cpu.status & ZERO_FLAG, 0);
   }
 }
