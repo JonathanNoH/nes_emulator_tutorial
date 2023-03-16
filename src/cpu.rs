@@ -141,6 +141,12 @@ impl CPU {
                 }
                 // CLC
                 0x18 => self.clc(),
+                // CLD
+                0xd8 => self.cld(),
+                //CLI
+                0x58 => self.cli(),
+                // CLV
+                0xb8 => self.clv(),
                 // LDA
                 0xa9 | 0xa5 | 0xb5 | 0xad | 0xbd | 0xb9 | 0xa1 | 0xb1 => {
                     self.lda(&opcode.mode);
@@ -374,6 +380,16 @@ impl CPU {
         self.status = self.status & INV_CARRY_FLAG;
     }
 
+    fn cld(&mut self) {
+        self.status = self.status & INV_DECIMAL_MODE_FLAG;
+    }
+    fn cli(&mut self) {
+        self.status = self.status & INV_INTERRUPT_DISABLE;
+    }
+    fn clv(&mut self) {
+        self.status = self.status & INV_OVERFLOW_FLAG;
+    }
+
     fn lda(&mut self, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
         let value = self.mem_read(addr);
@@ -566,5 +582,35 @@ mod tests {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xa9, 0xff, 0x69, 0x01, 0x18, 0x00]);
     assert_eq!(cpu.status & CARRY_FLAG, 0);
+  }
+
+  #[test]
+  fn test_cld() {
+    let mut cpu = CPU::new();
+    cpu.load(vec![0xd8, 0x00]);
+    cpu.reset();
+    cpu.status = cpu.status | DECIMAL_MODE_FLAG;
+    cpu.run();
+    assert_eq!(cpu.status & DECIMAL_MODE_FLAG, 0);
+  }
+
+  #[test]
+  fn test_cli() {
+    let mut cpu = CPU::new();
+    cpu.load(vec![0x58, 0x00]);
+    cpu.reset();
+    cpu.status = cpu.status | INTERRUPT_DISABLE;
+    cpu.run();
+    assert_eq!(cpu.status & INTERRUPT_DISABLE, 0);
+  }
+
+  #[test]
+  fn test_clv() {
+    let mut cpu = CPU::new();
+    cpu.load(vec![0xb8, 0x00]);
+    cpu.reset();
+    cpu.status = cpu.status | OVERFLOW_FLAG;
+    cpu.run();
+    assert_eq!(cpu.status & OVERFLOW_FLAG, 0);
   }
 }
