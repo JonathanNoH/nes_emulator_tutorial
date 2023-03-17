@@ -212,6 +212,14 @@ impl CPU {
                 0x09 | 0x05 | 0x15 | 0x0d | 0x1d | 0x19 | 0x01 | 0x11 => {
                     self.ora(&opcode.mode);
                 }
+                // PHA
+                0x48 => self.pha(),
+                // PHP
+                0x08 => self.php(),
+                // PLA
+                0x68 => self.pla(),
+                // PLP
+                0x28 => self.plp(),
                 // STA
                 0x85 | 0x95 | 0x8d | 0x9d | 0x99 | 0x81 | 0x91 => {
                     self.sta(&opcode.mode);
@@ -576,6 +584,29 @@ impl CPU {
         let value = self.mem_read(addr);
         self.register_a = self.register_a | value;
         self.update_zero_and_negative_flags(self.register_a);
+    }
+
+    fn pha(&mut self) {
+        self.mem_write(STACK + (self.stack_ptr as u16), self.register_a);
+        self.stack_ptr -= 1;
+    }
+
+    fn php(&mut self) {
+        self.mem_write(STACK + (self.stack_ptr as u16), self.status);
+        self.stack_ptr -= 1;
+    }
+
+    fn pla(&mut self) {
+        self.stack_ptr += 1;
+        self.register_a = self.mem_read(STACK + (self.stack_ptr as u16));
+        self.update_zero_and_negative_flags(self.register_a);
+        self.mem_write(STACK + (self.stack_ptr as u16), 0x00);
+    }
+
+    fn plp(&mut self) {
+        self.stack_ptr += 1;
+        self.status = self.mem_read(STACK + (self.stack_ptr as u16));
+        self.mem_write(STACK + (self.stack_ptr as u16), 0x00);
     }
 
     fn sta(&mut self, mode: &AddressingMode) {
@@ -962,5 +993,49 @@ mod tests {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xa9, 0x01, 0x85, 0x10, 0xa9, 0x02, 0x05, 0x10, 0x00]);
     assert_eq!(cpu.register_a, 0x03);
+  }
+
+  #[test]
+  fn test_pha() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x01, 0x48, 0x48, 0x00]);
+    assert_eq!(cpu.mem_read(0x01ff), 0x01);
+    assert_eq!(cpu.mem_read(0x01fe), 0x01);
+    assert_eq!(cpu.stack_ptr, 0xfd);
+  }
+
+  #[test]
+  fn test_php() {
+    let mut cpu = CPU::new();
+    cpu.load(vec![0x08, 0x08, 0x00]);
+    cpu.reset();
+    cpu.status = 0b1100_1101;
+    cpu.run();
+    assert_eq!(cpu.mem_read(0x01ff), 0b1100_1101);
+    assert_eq!(cpu.mem_read(0x01fe), 0b1100_1101);
+    assert_eq!(cpu.mem_read(0x1fd), 0x00);
+    assert_eq!(cpu.stack_ptr, 0xfd);
+  }
+
+  #[test]
+  fn test_pla() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x01, 0x48, 0x48, 0xa9, 0x02, 0x68, 0x00]);
+    assert_eq!(cpu.mem_read(0x01ff), 0x01);
+    assert_eq!(cpu.mem_read(0x01fe), 0x00);
+    assert_eq!(cpu.stack_ptr, 0xfe);
+    assert_eq!(cpu.register_a, 0x01);
+  }
+
+  #[test]
+  fn test_plp() {
+    let mut cpu = CPU::new();
+    cpu.load(vec![0x08, 0x08, 0x28, 0x00]);
+    cpu.reset();
+    cpu.status = 0b1100_1101;
+    cpu.run();
+    assert_eq!(cpu.mem_read(0x01ff), 0b1100_1101);
+    assert_eq!(cpu.mem_read(0x01fe), 0);
+    assert_eq!(cpu.stack_ptr, 0xfe);
   }
 }
