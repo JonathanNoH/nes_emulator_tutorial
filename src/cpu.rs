@@ -233,6 +233,8 @@ impl CPU {
                 0x6a | 0x66 | 0x76 | 0x6e | 0x7e => {
                     self.ror(&opcode.mode);
                 }
+                // RTI
+                0x40 => self.rti(),
                 // STA
                 0x85 | 0x95 | 0x8d | 0x9d | 0x99 | 0x81 | 0x91 => {
                     self.sta(&opcode.mode);
@@ -684,6 +686,14 @@ impl CPU {
                 self.update_zero_and_negative_flags(new_data);
             }
         }
+    }
+
+    fn rti(&mut self) {
+        self.plp();
+        self.stack_ptr += 1;
+        let prg_addr = self.mem_read_u16(STACK + self.stack_ptr as u16);
+        self.program_counter = prg_addr;
+        self.stack_ptr += 1;
     }
 
     fn sta(&mut self, mode: &AddressingMode) {
@@ -1169,5 +1179,10 @@ mod tests {
     cpu.load_and_run(vec![0xa9, 0xff, 0x85, 0x10, 0x66, 0x10, 0x66, 0x10, 0x00]);
     assert_eq!(cpu.mem_read(0x10), 0xbf);
     assert_ne!(cpu.status & CARRY_FLAG, 0);
+  }
+
+  #[test]
+  fn test_rti() {
+    todo!()
   }
 }
