@@ -249,6 +249,14 @@ impl CPU {
                 0x85 | 0x95 | 0x8d | 0x9d | 0x99 | 0x81 | 0x91 => {
                     self.sta(&opcode.mode);
                 }
+                // STX
+                0x86 | 0x96 | 0x8e => {
+                    self.stx(&opcode.mode);
+                }
+                // STY
+                0x84 | 0x94 | 0x8c => {
+                    self.sty(&opcode.mode);
+                }
                 0xAA => self.tax(), // TAX
                 0x00 => return, // BRK
                 _ => panic!("Something went wrong. Invalid Command.")
@@ -732,6 +740,16 @@ impl CPU {
     fn sta(&mut self, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
         self.mem_write(addr, self.register_a);
+    }
+
+    fn stx(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        self.mem_write(addr, self.register_x);
+    }
+
+    fn sty(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        self.mem_write(addr, self.register_y);
     }
 
     fn tax(&mut self) {
@@ -1246,5 +1264,21 @@ mod tests {
     cpu.load_and_run(vec![0xa9, 0xd0, 0x85, 0x10, 0xa9, 0xf0, 0xe5, 0x10, 0x00]);
     assert_eq!(cpu.register_a, 0x1f);
     assert_ne!(cpu.status & CARRY_FLAG, 0);
+  }
+
+  #[test]
+  fn test_stx() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa2, 0x01, 0x86, 0x12, 0x00]);
+    assert_eq!(cpu.register_x, 1);
+    assert_eq!(cpu.mem_read(0x12), 1);
+  }
+
+  #[test]
+  fn  test_sty() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa0, 0x01, 0x84, 0x12, 0x00]);
+    assert_eq!(cpu.register_y, 1);
+    assert_eq!(cpu.mem_read(0x12), 1);
   }
 }
