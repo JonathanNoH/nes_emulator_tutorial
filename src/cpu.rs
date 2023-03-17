@@ -229,6 +229,10 @@ impl CPU {
                 0x2a | 0x26 | 0x36 | 0x2e | 0x3e => {
                     self.rol(&opcode.mode);
                 }
+                // ROR
+                0x6a | 0x66 | 0x76 | 0x6e | 0x7e => {
+                    self.ror(&opcode.mode);
+                }
                 // STA
                 0x85 | 0x95 | 0x8d | 0x9d | 0x99 | 0x81 | 0x91 => {
                     self.sta(&opcode.mode);
@@ -648,6 +652,33 @@ impl CPU {
                 let mut new_data = (((data as u16) << 1) & 0b0_1111_1111) as u8;
                 if old_carry != 0 {
                     new_data = new_data | 0b0000_0001;
+                }
+                self.mem_write(addr, new_data);
+                self.update_zero_and_negative_flags(new_data);
+            }
+        }
+    }
+
+    fn ror(&mut self, mode: &AddressingMode) {
+        match mode {
+            AddressingMode::NoneAddressing => {
+                let old_carry = self.status & CARRY_FLAG;
+                self.update_carry_flag(self.register_a & 1 != 0);
+                self.register_a = self.register_a >> 1;
+                if old_carry != 0 {
+                    self.register_a = self.register_a | 0b1000_0000;
+                }
+                self.update_zero_and_negative_flags(self.register_a);
+            }
+            _ => {
+                let addr = self.get_operand_address(mode);
+                let data = self.mem_read(addr);
+
+                let old_carry = self.status & CARRY_FLAG;
+                self.update_carry_flag(data & 1 != 0);
+                let mut new_data = data >> 1;
+                if old_carry != 0 {
+                    new_data = new_data | 0b1000_0000;
                 }
                 self.mem_write(addr, new_data);
                 self.update_zero_and_negative_flags(new_data);
@@ -1121,6 +1152,22 @@ mod tests {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xa9, 0xff, 0x85, 0x10, 0x26, 0x10, 0x26, 0x10, 0x00]);
     assert_eq!(cpu.mem_read(0x10), 0xfd);
+    assert_ne!(cpu.status & CARRY_FLAG, 0);
+  }
+
+  #[test]
+  fn test_ror_accumulator() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0xff, 0x6a, 0x6a, 0x00]);
+    assert_eq!(cpu.register_a, 0xbf);
+    assert_ne!(cpu.status & CARRY_FLAG, 0);
+  }
+
+  #[test]
+  fn test_ror_mem() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0xff, 0x85, 0x10, 0x66, 0x10, 0x66, 0x10, 0x00]);
+    assert_eq!(cpu.mem_read(0x10), 0xbf);
     assert_ne!(cpu.status & CARRY_FLAG, 0);
   }
 }
