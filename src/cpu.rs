@@ -542,7 +542,7 @@ impl CPU {
     }
 
     fn jsr(&mut self, mode: &AddressingMode) {
-        self.mem_write_u16(STACK + (self.stack_ptr as u16) - 1, self.program_counter + 3 /* jsr len */ - 1);
+        self.mem_write_u16(STACK + (self.stack_ptr as u16) - 1, self.program_counter + 3 - 1/* jsr len */ - 1);
         self.stack_ptr -= 2;
         
         self.jmp(mode);
@@ -628,7 +628,7 @@ impl CPU {
     fn rts(&mut self) {
         self.stack_ptr += 1;
         let prg_addr = self.mem_read_u16(STACK + self.stack_ptr as u16);
-        self.program_counter = prg_addr; // pretty sure docs say i should add one here but it breaks it
+        self.program_counter = prg_addr + 1;
         self.stack_ptr += 1;
     }
 
