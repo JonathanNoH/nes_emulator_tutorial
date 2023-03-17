@@ -116,7 +116,7 @@ lazy_static! {
         OpCode::new(0x4c, "JMP", 3, 3, AddressingMode::Absolute),
         OpCode::new(0x6c, "JMP", 3, 5, AddressingMode::Indirect),
 
-        // JSR
+        OpCode::new(0x20, "JSR", 3, 6, AddressingMode::Absolute),
 
         OpCode::new(0xa9, "LDA", 2, 2, AddressingMode::Immediate),
         OpCode::new(0xa5, "LDA", 2, 3, AddressingMode::ZeroPage),
@@ -160,6 +160,8 @@ lazy_static! {
         OpCode::new(0x08, "PHP", 1, 3, AddressingMode::NoneAddressing),
         OpCode::new(0x68, "PLA", 1, 4, AddressingMode::NoneAddressing),
         OpCode::new(0x28, "PLP", 1, 4, AddressingMode::NoneAddressing),
+
+        OpCode::new(0x60, "RTS", 1, 6, AddressingMode::NoneAddressing),
     ];
 
     pub static ref OPCODES_MAP: HashMap<u8, &'static OpCode> = {

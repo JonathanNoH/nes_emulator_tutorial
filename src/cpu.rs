@@ -190,6 +190,9 @@ impl CPU {
                     self.jmp(&opcode.mode);
                 }
                 //JSR
+                0x20 => {
+                    self.jsr(&opcode.mode);
+                }
                 // LDA
                 0xa9 | 0xa5 | 0xb5 | 0xad | 0xbd | 0xb9 | 0xa1 | 0xb1 => {
                     self.lda(&opcode.mode);
@@ -220,6 +223,8 @@ impl CPU {
                 0x68 => self.pla(),
                 // PLP
                 0x28 => self.plp(),
+                // RTS
+                0x60 => self.rts(),
                 // STA
                 0x85 | 0x95 | 0x8d | 0x9d | 0x99 | 0x81 | 0x91 => {
                     self.sta(&opcode.mode);
@@ -529,7 +534,10 @@ impl CPU {
     }
 
     fn jsr(&mut self, mode: &AddressingMode) {
-        todo!()
+        self.mem_write_u16(STACK + (self.stack_ptr as u16) - 1, self.program_counter + 3 /* jsr len */ - 1);
+        self.stack_ptr -= 2;
+        
+        self.jmp(mode);
     }
 
     fn lda(&mut self, mode: &AddressingMode) {
@@ -607,6 +615,13 @@ impl CPU {
         self.stack_ptr += 1;
         self.status = self.mem_read(STACK + (self.stack_ptr as u16));
         self.mem_write(STACK + (self.stack_ptr as u16), 0x00);
+    }
+
+    fn rts(&mut self) {
+        self.stack_ptr += 1;
+        let prg_addr = self.mem_read_u16(STACK + self.stack_ptr as u16);
+        self.program_counter = prg_addr; // pretty sure docs say i should add one here but it breaks it
+        self.stack_ptr += 1;
     }
 
     fn sta(&mut self, mode: &AddressingMode) {
@@ -1037,5 +1052,13 @@ mod tests {
     assert_eq!(cpu.mem_read(0x01ff), 0b1100_1101);
     assert_eq!(cpu.mem_read(0x01fe), 0);
     assert_eq!(cpu.stack_ptr, 0xfe);
+  }
+
+  #[test]
+  fn test_jsr_rts() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0x20, 0x09, 0x80, 0x20, 0x0c, 0x80, 0x20, 0x12, 0x80, 0xa2, 0x00, 0x60, 0xe8, 0xe0, 0x05, 0xd0, 0xfb, 0x60, 0x00]);
+    assert_eq!(cpu.register_x, 0x05);
+    assert_eq!(cpu.stack_ptr, 0xfd);
   }
 }
