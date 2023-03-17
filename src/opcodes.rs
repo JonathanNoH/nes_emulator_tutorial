@@ -162,6 +162,12 @@ lazy_static! {
         OpCode::new(0x28, "PLP", 1, 4, AddressingMode::NoneAddressing),
 
         OpCode::new(0x60, "RTS", 1, 6, AddressingMode::NoneAddressing),
+
+        OpCode::new(0x2a, "ROL", 1, 2, AddressingMode::NoneAddressing),
+        OpCode::new(0x26, "ROL", 2, 5, AddressingMode::ZeroPage),
+        OpCode::new(0x36, "ROL", 2, 6, AddressingMode::ZeroPage_X),
+        OpCode::new(0x2e, "ROL", 3, 6, AddressingMode::Absolute),
+        OpCode::new(0x3e, "ROL", 3, 7, AddressingMode::Absolute_X),
     ];
 
     pub static ref OPCODES_MAP: HashMap<u8, &'static OpCode> = {

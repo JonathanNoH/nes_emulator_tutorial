@@ -225,6 +225,10 @@ impl CPU {
                 0x28 => self.plp(),
                 // RTS
                 0x60 => self.rts(),
+                // ROL
+                0x2a | 0x26 | 0x36 | 0x2e | 0x3e => {
+                    self.rol(&opcode.mode);
+                }
                 // STA
                 0x85 | 0x95 | 0x8d | 0x9d | 0x99 | 0x81 | 0x91 => {
                     self.sta(&opcode.mode);
@@ -622,6 +626,33 @@ impl CPU {
         let prg_addr = self.mem_read_u16(STACK + self.stack_ptr as u16);
         self.program_counter = prg_addr; // pretty sure docs say i should add one here but it breaks it
         self.stack_ptr += 1;
+    }
+
+    fn rol(&mut self, mode: &AddressingMode) {
+        match mode {
+            AddressingMode::NoneAddressing => {
+                let old_carry = self.status & CARRY_FLAG;
+                self.update_carry_flag(self.register_a & 0b1000_0000 != 0);
+                self.register_a = (((self.register_a as u16) << 1) & 0b0_1111_1111) as u8;
+                if old_carry != 0 {
+                    self.register_a = self.register_a | 0b0000_0001;
+                }
+                self.update_zero_and_negative_flags(self.register_a);
+            }
+            _ => {
+                let addr = self.get_operand_address(mode);
+                let data = self.mem_read(addr);
+
+                let old_carry = self.status & CARRY_FLAG;
+                self.update_carry_flag(data & 0b1000_0000 != 0);
+                let mut new_data = (((data as u16) << 1) & 0b0_1111_1111) as u8;
+                if old_carry != 0 {
+                    new_data = new_data | 0b0000_0001;
+                }
+                self.mem_write(addr, new_data);
+                self.update_zero_and_negative_flags(new_data);
+            }
+        }
     }
 
     fn sta(&mut self, mode: &AddressingMode) {
@@ -1060,5 +1091,36 @@ mod tests {
     cpu.load_and_run(vec![0x20, 0x09, 0x80, 0x20, 0x0c, 0x80, 0x20, 0x12, 0x80, 0xa2, 0x00, 0x60, 0xe8, 0xe0, 0x05, 0xd0, 0xfb, 0x60, 0x00]);
     assert_eq!(cpu.register_x, 0x05);
     assert_eq!(cpu.stack_ptr, 0xfd);
+  }
+
+  #[test]
+  fn test_rol_accumulator() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x01, 0x2a, 0x00]);
+    assert_eq!(cpu.register_a, 0x02);
+  }
+
+  #[test]
+  fn test_rol_accumulator_shift_carry() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0xff, 0x2a, 0x00]);
+    assert_eq!(cpu.register_a, 0xfe);
+    assert_ne!(cpu.status & CARRY_FLAG, 0);
+  }
+
+  #[test]
+  fn test_rol_acc_shift_carry_to_acc() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0xff, 0x2a, 0x2a, 0x00]);
+    assert_eq!(cpu.register_a, 0xfd);
+    assert_ne!(cpu.status & CARRY_FLAG, 0);
+  }
+
+  #[test]
+  fn test_rol_mem() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0xff, 0x85, 0x10, 0x26, 0x10, 0x26, 0x10, 0x00]);
+    assert_eq!(cpu.mem_read(0x10), 0xfd);
+    assert_ne!(cpu.status & CARRY_FLAG, 0);
   }
 }
