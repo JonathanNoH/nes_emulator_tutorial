@@ -257,7 +257,18 @@ impl CPU {
                 0x84 | 0x94 | 0x8c => {
                     self.sty(&opcode.mode);
                 }
-                0xAA => self.tax(), // TAX
+                // TAX
+                0xAA => self.tax(),
+                // TAY
+                0xa8 => self.tay(),
+                // TSX
+                0xba => self.tsx(),
+                // TXA
+                0x8a => self.txa(),
+                // TXA
+                0x9a => self.txs(),
+                // TYA
+                0x98 => self.tya(),
                 0x00 => return, // BRK
                 _ => panic!("Something went wrong. Invalid Command.")
             }
@@ -640,13 +651,13 @@ impl CPU {
         self.stack_ptr += 1;
         self.register_a = self.mem_read(STACK + (self.stack_ptr as u16));
         self.update_zero_and_negative_flags(self.register_a);
-        self.mem_write(STACK + (self.stack_ptr as u16), 0x00);
+        //self.mem_write(STACK + (self.stack_ptr as u16), 0x00);
     }
 
     fn plp(&mut self) {
         self.stack_ptr += 1;
         self.status = self.mem_read(STACK + (self.stack_ptr as u16));
-        self.mem_write(STACK + (self.stack_ptr as u16), 0x00);
+        //self.mem_write(STACK + (self.stack_ptr as u16), 0x00);
     }
 
     fn rts(&mut self) {
@@ -755,6 +766,30 @@ impl CPU {
     fn tax(&mut self) {
         self.register_x = self.register_a;
         self.update_zero_and_negative_flags(self.register_x);
+    }
+
+    fn tay(&mut self) {
+        self.register_y = self.register_a;
+        self.update_zero_and_negative_flags(self.register_y);
+    }
+
+    fn tsx(&mut self) {
+        self.register_x = self.stack_ptr;
+        self.update_zero_and_negative_flags(self.register_x);
+    }
+
+    fn txs(&mut self) {
+        self.stack_ptr = self.register_x;
+    }
+
+    fn txa(&mut self) {
+        self.register_a = self.register_x;
+        self.update_zero_and_negative_flags(self.register_a);
+    }
+
+    fn tya(&mut self) {
+        self.register_a = self.register_y;
+        self.update_zero_and_negative_flags(self.register_a);
     }
 }
 
@@ -1160,7 +1195,7 @@ mod tests {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xa9, 0x01, 0x48, 0x48, 0xa9, 0x02, 0x68, 0x00]);
     assert_eq!(cpu.mem_read(0x01ff), 0x01);
-    assert_eq!(cpu.mem_read(0x01fe), 0x00);
+    //assert_eq!(cpu.mem_read(0x01fe), 0x00);
     assert_eq!(cpu.stack_ptr, 0xfe);
     assert_eq!(cpu.register_a, 0x01);
   }
@@ -1173,7 +1208,7 @@ mod tests {
     cpu.status = 0b1100_1101;
     cpu.run();
     assert_eq!(cpu.mem_read(0x01ff), 0b1100_1101);
-    assert_eq!(cpu.mem_read(0x01fe), 0);
+    //assert_eq!(cpu.mem_read(0x01fe), 0);
     assert_eq!(cpu.stack_ptr, 0xfe);
   }
 
@@ -1275,10 +1310,32 @@ mod tests {
   }
 
   #[test]
-  fn  test_sty() {
+  fn test_sty() {
     let mut cpu = CPU::new();
     cpu.load_and_run(vec![0xa0, 0x01, 0x84, 0x12, 0x00]);
     assert_eq!(cpu.register_y, 1);
     assert_eq!(cpu.mem_read(0x12), 1);
+  }
+
+  #[test]
+  fn test_tay() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x01, 0xa8, 0x00]);
+    assert_eq!(cpu.register_y, 1);
+  }
+
+  #[test]
+  fn test_tsx() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0x01, 0x48, 0xba, 0x00]);
+    assert_eq!(cpu.stack_ptr, 0xfe);
+    assert_eq!(cpu.register_x, 0xfe);
+  }
+
+  #[test]
+  fn test_txa() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa2, 0x01, 0x8a, 0x00]);
+    assert_eq!(cpu.register_x, 0x01);
   }
 }
