@@ -235,6 +235,12 @@ impl CPU {
                 }
                 // RTI
                 0x40 => self.rti(),
+                // SBC
+                0xe9 | 0xe5 | 0xf5 | 0xed | 0xfd | 0xf9 | 0xe1 | 0xf1 => {
+                    self.sbc(&opcode.mode);
+                }
+                // SEC
+                0x38 => self.sec(),
                 // STA
                 0x85 | 0x95 | 0x8d | 0x9d | 0x99 | 0x81 | 0x91 => {
                     self.sta(&opcode.mode);
@@ -331,6 +337,10 @@ impl CPU {
         let addr = self.get_operand_address(mode);
         let value = self.mem_read(addr);
 
+        self.addition(value);
+    }
+
+    fn addition(&mut self, value: u8) {
         // add self.register_a and value 
         let (mut result, mut carry) = self.register_a.overflowing_add(value);
         // add 1 if carry flag already set
@@ -694,6 +704,17 @@ impl CPU {
         let prg_addr = self.mem_read_u16(STACK + self.stack_ptr as u16);
         self.program_counter = prg_addr;
         self.stack_ptr += 1;
+    }
+
+    fn sbc(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let value = self.mem_read(addr);
+
+        self.addition(255-value);
+    }
+
+    fn sec(&mut self) {
+        self.status = self.status | CARRY_FLAG;
     }
 
     fn sta(&mut self, mode: &AddressingMode) {
@@ -1180,9 +1201,38 @@ mod tests {
     assert_eq!(cpu.mem_read(0x10), 0xbf);
     assert_ne!(cpu.status & CARRY_FLAG, 0);
   }
-
+  /*
   #[test]
   fn test_rti() {
     todo!()
+  }*/
+
+  #[test]
+  fn test_sbc() {
+    let mut cpu = CPU::new();
+    cpu.load(vec![0xa9, 0xf0, 0x85, 0x10, 0xa9, 0x50, 0xe5, 0x10, 0x00]);
+    cpu.reset();
+    cpu.status = cpu.status | CARRY_FLAG;
+    cpu.run();
+    assert_eq!(cpu.register_a, 0x60);
+    assert_eq!(cpu.status & CARRY_FLAG, 0);
+    assert_eq!(cpu.status & OVERFLOW_FLAG, 0);
+  }
+
+  #[test]
+  fn test_sbc_set_overflow() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0xb0, 0x85, 0x10, 0xa9, 0x50, 0x38, 0xe5, 0x10, 0x00]);
+    assert_eq!(cpu.register_a, 0xa0);
+    assert_eq!(cpu.status & CARRY_FLAG, 0);
+    assert_ne!(cpu.status & OVERFLOW_FLAG, 0);
+  }
+
+  #[test]
+  fn test_sbc_sets_carry() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa9, 0xd0, 0x85, 0x10, 0xa9, 0xf0, 0xe5, 0x10, 0x00]);
+    assert_eq!(cpu.register_a, 0x1f);
+    assert_ne!(cpu.status & CARRY_FLAG, 0);
   }
 }
