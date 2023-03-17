@@ -241,6 +241,10 @@ impl CPU {
                 }
                 // SEC
                 0x38 => self.sec(),
+                // SED
+                0xf8 => self.sed(),
+                // SEI
+                0x78 => self.sei(),
                 // STA
                 0x85 | 0x95 | 0x8d | 0x9d | 0x99 | 0x81 | 0x91 => {
                     self.sta(&opcode.mode);
@@ -715,6 +719,14 @@ impl CPU {
 
     fn sec(&mut self) {
         self.status = self.status | CARRY_FLAG;
+    }
+
+    fn sed(&mut self) {
+        self.status = self.status | DECIMAL_MODE_FLAG;
+    }
+
+    fn sei(&mut self) {
+        self.status = self.status | INTERRUPT_DISABLE;
     }
 
     fn sta(&mut self, mode: &AddressingMode) {

@@ -20,14 +20,6 @@ lazy_static! {
         OpCode::new(0x00, "BRK", 1, 7, AddressingMode::NoneAddressing),
         OpCode::new(0xaa, "TAX", 1, 2, AddressingMode::NoneAddressing),
 
-        OpCode::new(0x85, "STA", 2, 3, AddressingMode::ZeroPage),
-        OpCode::new(0x95, "STA", 2, 4, AddressingMode::ZeroPage_X),
-        OpCode::new(0x8d, "STA", 3, 4, AddressingMode::Absolute),
-        OpCode::new(0x9d, "STA", 3, 5, AddressingMode::Absolute_X),
-        OpCode::new(0x99, "STA", 3, 5, AddressingMode::Absolute_Y),
-        OpCode::new(0x81, "STA", 2, 6, AddressingMode::Indirect_X),
-        OpCode::new(0x91, "STA", 2, 6, AddressingMode::Indirect_Y),
-
         OpCode::new(0x69, "ADC", 2, 2, AddressingMode::Immediate),
         OpCode::new(0x65, "ADC", 2, 3, AddressingMode::ZeroPage),
         OpCode::new(0x75, "ADC", 2, 4, AddressingMode::ZeroPage_X),
@@ -187,6 +179,16 @@ lazy_static! {
         OpCode::new(0xf1, "SBC", 2, 5, AddressingMode::Indirect_Y),
 
         OpCode::new(0x38, "SEC", 1, 2, AddressingMode::NoneAddressing),
+        OpCode::new(0xf8, "SED", 1, 2, AddressingMode::NoneAddressing),
+        OpCode::new(0x78, "SEI", 1, 2, AddressingMode::NoneAddressing),
+
+        OpCode::new(0x85, "STA", 2, 3, AddressingMode::ZeroPage),
+        OpCode::new(0x95, "STA", 2, 4, AddressingMode::ZeroPage_X),
+        OpCode::new(0x8d, "STA", 3, 4, AddressingMode::Absolute),
+        OpCode::new(0x9d, "STA", 3, 5, AddressingMode::Absolute_X),
+        OpCode::new(0x99, "STA", 3, 5, AddressingMode::Absolute_Y),
+        OpCode::new(0x81, "STA", 2, 6, AddressingMode::Indirect_X),
+        OpCode::new(0x91, "STA", 2, 6, AddressingMode::Indirect_Y),
     ];
 
     pub static ref OPCODES_MAP: HashMap<u8, &'static OpCode> = {
