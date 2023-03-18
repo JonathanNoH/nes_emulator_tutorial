@@ -1,4 +1,4 @@
-use crate::opcodes;
+use crate::{opcodes, bus::Bus};
 use std::collections::HashMap;
 
 pub const CARRY_FLAG: u8 =        0b0000_0001;
@@ -30,7 +30,7 @@ pub struct CPU {
     pub status: u8,
     pub program_counter: u16,
     pub stack_ptr: u8,
-    memory: [u8; 0xFFFF]
+    pub bus: Bus,
 }
 
 #[derive(Debug)]
@@ -48,28 +48,12 @@ pub enum AddressingMode {
     Indirect_Y,
     NoneAddressing,
 }
-  
-impl CPU {
 
-    pub fn new() -> Self {
-        CPU {
-            register_a: 0,
-            register_x: 0,
-            register_y: 0,
-            status: 0,
-            program_counter: 0,
-            stack_ptr: STACK_RESET,
-            memory: [0x00; 0xFFFF]
-        }
-    }
+pub trait Mem {
+    fn mem_read(&self, addr: u16) -> u8;
 
-    pub fn mem_read(&self, addr: u16) -> u8 {
-        self.memory[addr as usize]
-    }
+    fn mem_write(&mut self, addr: u16, data: u8);
 
-    pub fn mem_write(&mut self, addr: u16, data: u8) {
-        self.memory[addr as usize] = data;
-    }
 
     fn mem_read_u16(&self, pos: u16) -> u16 {
         let lo = self.mem_read(pos) as u16;
@@ -82,6 +66,40 @@ impl CPU {
         let lo = (data & 0xff) as u8;
         self.mem_write(pos, lo);
         self.mem_write(pos + 1, hi);
+    }
+}
+
+impl Mem for CPU {
+
+    fn mem_read(&self, addr: u16) -> u8 {
+        self.bus.mem_read(addr)
+    }
+
+    fn mem_write(&mut self, addr: u16, data: u8) {
+        self.bus.mem_write(addr, data);
+    }
+
+    fn mem_read_u16(&self, pos: u16) -> u16 {
+        self.bus.mem_read_u16(pos)
+    }
+
+    fn mem_write_u16(&mut self, pos: u16, data: u16) {
+        self.bus.mem_write_u16(pos, data);
+    }
+}
+  
+impl CPU {
+
+    pub fn new() -> Self {
+        CPU {
+            register_a: 0,
+            register_x: 0,
+            register_y: 0,
+            status: 0,
+            program_counter: 0,
+            stack_ptr: STACK_RESET,
+            bus: Bus::new(),
+        }
     }
 
     pub fn reset(&mut self) {
@@ -100,8 +118,10 @@ impl CPU {
 
     pub fn load(&mut self, program: Vec<u8>) {
         /* CHANGE BACK TO 0x8000 */
-        self.memory[0x0600 .. (0x0600 + program.len())].copy_from_slice(&program[..]);
-        self.mem_write_u16(0xFFFC, 0x0600);
+        for i in 0..(program.len() as u16) {
+            self.mem_write(0x8000 + i, program[i as usize]);
+        }
+        self.mem_write_u16(0xFFFC, 0x8000);
     }
 
     pub fn run(&mut self) {
@@ -119,7 +139,6 @@ impl CPU {
             let program_counter_state = self.program_counter;
 
             let opcode = opcodes.get(&code).expect(&format!("OpCode {:x} is not recognized", code));
-            println!("{:#04x}, {:#04x}, {:#04x}", code, self.mem_read(self.program_counter), self.mem_read(self.program_counter + 1));
             match code {
                 // ADC
                 0x69 | 0x65 | 0x75 | 0x6d | 0x7d | 0x79 | 0x61 | 0x71 => {
