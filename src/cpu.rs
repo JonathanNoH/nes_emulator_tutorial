@@ -63,11 +63,11 @@ impl CPU {
         }
     }
 
-    fn mem_read(&self, addr: u16) -> u8 {
+    pub fn mem_read(&self, addr: u16) -> u8 {
         self.memory[addr as usize]
     }
 
-    fn mem_write(&mut self, addr: u16, data: u8) {
+    pub fn mem_write(&mut self, addr: u16, data: u8) {
         self.memory[addr as usize] = data;
     }
 
@@ -88,7 +88,7 @@ impl CPU {
         self.register_a = 0;
         self.register_x = 0;
         self.status = 0;
-
+        self.stack_ptr = STACK_RESET;
         self.program_counter = self.mem_read_u16(0xFFFC);
     }
 
@@ -99,8 +99,9 @@ impl CPU {
     }
 
     pub fn load(&mut self, program: Vec<u8>) {
-        self.memory[0x8000 .. (0x8000 + program.len())].copy_from_slice(&program[..]);
-        self.mem_write_u16(0xFFFC, 0x8000);
+        /* CHANGE BACK TO 0x8000 */
+        self.memory[0x0600 .. (0x0600 + program.len())].copy_from_slice(&program[..]);
+        self.mem_write_u16(0xFFFC, 0x0600);
     }
 
     pub fn run(&mut self) {
@@ -118,7 +119,7 @@ impl CPU {
             let program_counter_state = self.program_counter;
 
             let opcode = opcodes.get(&code).expect(&format!("OpCode {:x} is not recognized", code));
-
+            println!("{:#04x}, {:#04x}, {:#04x}", code, self.mem_read(self.program_counter), self.mem_read(self.program_counter + 1));
             match code {
                 // ADC
                 0x69 | 0x65 | 0x75 | 0x6d | 0x7d | 0x79 | 0x61 | 0x71 => {
@@ -283,6 +284,8 @@ impl CPU {
             if program_counter_state == self.program_counter {
                 self.program_counter += (opcode.len - 1) as u16;
             }
+
+            callback(self);
         }
     }
 
@@ -372,13 +375,14 @@ impl CPU {
 
     fn addition(&mut self, value: u8) {
         // add self.register_a and value 
-        let (mut result, mut carry) = self.register_a.overflowing_add(value);
+        let (mut result, carry_one) = self.register_a.overflowing_add(value);
         // add 1 if carry flag already set
+        let mut carry_two = false;
         if self.status & 0b0000_0001 != 0 {
-            (result, carry) = result.overflowing_add(1);
+            (result, carry_two) = result.overflowing_add(1);
         }
         // set carry flag
-        self.update_carry_flag(carry);
+        self.update_carry_flag(carry_one || carry_two);
         // set overflow with magic math
         if ((self.register_a ^ result) & (value ^ result) & 0x80) != 0 {
             self.status = self.status | OVERFLOW_FLAG;
@@ -514,12 +518,9 @@ impl CPU {
     fn compare(&mut self, comparator: u8, mode: &AddressingMode) {
         let addr = self.get_operand_address(mode);
         let value = self.mem_read(addr);
-        if comparator >= value {
-            self.status = self.status | CARRY_FLAG;
-        } else {
-            self.status = self.status & INV_CARRY_FLAG;
-        }
+        self.update_carry_flag(comparator >= value);
         self.update_zero_and_negative_flags(comparator.wrapping_sub(value));
+        if comparator == value { self.update_carry_flag(true)};
     }
 
     fn cmp(&mut self, mode: &AddressingMode) {
