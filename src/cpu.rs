@@ -1338,4 +1338,11 @@ mod tests {
     cpu.load_and_run(vec![0xa2, 0x01, 0x8a, 0x00]);
     assert_eq!(cpu.register_x, 0x01);
   }
+
+  #[test]
+  fn test_tya() {
+    let mut cpu = CPU::new();
+    cpu.load_and_run(vec![0xa0, 0x01, 0x98, 0x00]);
+    assert_eq!(cpu.register_y, 0x01);
+  }
 }
