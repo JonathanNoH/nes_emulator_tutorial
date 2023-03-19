@@ -2,21 +2,27 @@ pub mod cpu;
 pub mod opcodes;
 pub mod bus;
 pub mod rom;
+pub mod trace;
+//use std::collections::HashMap;
+use trace::trace;
 use std::fs;
 use bus::Bus;
 use cpu::CPU;
-use cpu::Mem;
-use rand::Rng;
+//use cpu::Mem;
+//use rand::Rng;
 use rom::Rom;
+
+//use crate::cpu::AddressingMode;
+/* 
 use sdl2::event::Event;
 use sdl2::EventPump;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
-use sdl2::pixels::PixelFormatEnum;
+use sdl2::pixels::PixelFormatEnum; */
 
 #[macro_use]
 extern crate lazy_static;
-
+/*
 fn color(byte: u8) -> Color {
     match byte {
         0 => sdl2::pixels::Color::BLACK,
@@ -71,7 +77,7 @@ fn handle_user_input(cpu: &mut CPU, event_pump: &mut EventPump) {
     }
 }
 
-fn main() {
+    
     // init sdl2
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
@@ -114,5 +120,17 @@ fn main() {
 
         ::std::thread::sleep(std::time::Duration::new(0, 70_000));
     });
+    */
+fn main() {
 
+    let nestest = fs::read("nestest.nes").unwrap();
+    let rom = Rom::new(&nestest).unwrap();
+    let bus = Bus::new(rom);
+    let mut cpu = CPU::new(bus);
+    cpu.reset();
+    cpu.program_counter = 0xC000;
+
+    cpu.run_with_callback(move |cpu| {
+        println!("{}", trace(cpu));
+    })
 }
