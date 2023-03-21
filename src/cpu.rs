@@ -298,6 +298,65 @@ impl CPU {
                 0x9a => self.txs(),
                 // TYA
                 0x98 => self.tya(),
+                /* UNOFFICIAL */
+                // ANC
+                0x0b | 0x2b => self.anc(&opcode.mode),
+                // ARR
+                0x6b => {
+                    self.arr(&opcode.mode);
+                }
+                // ASR
+                0x4b => {
+                    self.asr(&opcode.mode);
+                }
+                // LAX
+                0xab | 0xa3 | 0xa7 | 0xaf | 0xb3 | 0xb7 | 0xbf => {
+                    self.lax(&opcode.mode);
+                }
+                // SAX
+                0x83 | 0x87 | 0x8f | 0x97 => {
+                    self.sax(&opcode.mode);
+                }
+                // DCP
+                0xc3 | 0xc7 | 0xcf | 0xd3 | 0xd7 | 0xdb | 0xdf => {
+                    self.dcp(&opcode.mode);
+                }
+                // ISC
+                0xe3 | 0xe7 | 0xef | 0xf3 | 0xf7 | 0xfb | 0xff => {
+                    self.isc(&opcode.mode);
+                }
+                // RLA
+                0x23 | 0x27 | 0x2f | 0x33 | 0x37 | 0x3b | 0x3f => {
+                    self.rla(&opcode.mode);
+                }
+                // RRA
+                0x63 | 0x67 | 0x6f | 0x73 | 0x77 | 0x7b | 0x7f => {
+                    self.rra(&opcode.mode);
+                }
+                // SLO
+                0x03 | 0x07 | 0x0f | 0x13 | 0x17 | 0x1b | 0x1f => {
+                    self.slo(&opcode.mode);
+                }
+                // SRE 
+                0x43 | 0x47 | 0x4f | 0x53 | 0x57 | 0x5b | 0x5f => {
+                    self.sre(&opcode.mode);
+                }
+                // SBC but unofficial
+                0xeb => {
+                    self.sbc(&opcode.mode);
+                }
+                // MORE NOP
+                0x1a | 0x3a | 0x5a | 0x7a | 0xda | 0xfa => {
+                    self.nop();
+                }
+                // SKB NOP 2 ELECTRIC BOOGALOO
+                0x80 | 0x82 | 0x89 | 0xc2 | 0xe2 => {
+                    self.skb();
+                }
+                // SKB 3 RETURN OF THE NOP
+                0x0c | 0x1c | 0x3c | 0x5c | 0x7c | 0xdc | 0xfc | 0x04 | 0x44 | 0x64 | 0x14 | 0x34 | 0x54 | 0x74 | 0xd4 | 0xf4 => {
+                    self.skb();
+                }
                 0x00 => return, // BRK
                 _ => panic!("Something went wrong. Invalid Command.")
             }
@@ -865,6 +924,82 @@ impl CPU {
         self.register_a = self.register_y;
         self.update_zero_and_negative_flags(self.register_a);
     }
+
+    /* UNNOFFIAL OP CODES */
+
+    fn anc(&mut self, mode: &AddressingMode) {
+        self.and(mode);
+        self.update_carry_flag(self.status & NEGATIVE_FLAG != 0);
+    }
+
+    fn sax(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let data = self.register_a & self.register_x;
+        self.mem_write(addr, data);
+    }
+
+    fn arr(&mut self, mode: &AddressingMode) {
+        let addr = self.get_operand_address(mode);
+        let data = self.mem_read(addr);
+        self.register_a = data & self.register_a;
+        let old_carry = self.status & CARRY_FLAG;
+        self.register_a = self.register_a >> 1;
+        if old_carry != 0 {
+            self.register_a = self.register_a | 0b1000_0000;
+        }
+        self.update_carry_flag(self.register_a & 0b0100_0000 != 0);
+        self.update_zero_and_negative_flags(self.register_a);
+        if (self.register_a & 0b0100_0000) ^ (self.register_a & 0b0010_0000) != 0 {
+            self.status = self.status | OVERFLOW_FLAG;
+        } else {
+            self.status = self.status & INV_OVERFLOW_FLAG;
+        }
+    }
+
+    fn asr(&mut self, mode: &AddressingMode) {
+        self.and(mode);
+        self.lsr(&AddressingMode::NoneAddressing); // Accumulator addressing
+    }
+
+    fn lax(&mut self, mode: &AddressingMode) {
+        self.lda(mode);
+        self.tax();
+    }
+
+    fn dcp(&mut self, mode: &AddressingMode) {
+        self.dec(mode);
+        self.cmp(mode);
+    }
+
+    fn isc(&mut self, mode: &AddressingMode) {
+        self.inc(mode);
+        self.sbc(mode);
+    }
+
+    fn rla(&mut self, mode: &AddressingMode) {
+        self.rol(mode);
+        self.and(mode);
+    }
+
+    fn rra(&mut self, mode: &AddressingMode) {
+        self.ror(mode);
+        self.adc(mode);
+    }
+
+    fn slo(&mut self, mode: &AddressingMode) {
+        self.asl(mode);
+        self.ora(mode);
+    }
+
+    fn sre(&mut self, mode: &AddressingMode) {
+        self.lsr(mode);
+        self.eor(mode);
+    }
+
+    fn skb(&mut self) {
+        return;
+    }
+
 }
 
 #[cfg(test)]
