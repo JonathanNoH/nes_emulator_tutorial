@@ -3,6 +3,7 @@ pub mod opcodes;
 pub mod bus;
 pub mod rom;
 pub mod trace;
+pub mod ppu;
 //use std::collections::HashMap;
 use trace::trace;
 use std::fs;
